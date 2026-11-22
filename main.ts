@@ -18,8 +18,6 @@ const T: Record<number, [number, number, number]> = {
   0x41: [0, 2, 0], 0x50: [0, 1, 0], 0x51: [0, 1, 0], 0x52: [0, 0, 1],
   0x53: [0, 1, 0],
 };
-const enc = new TextEncoder();
-
 function run(p: Uint8Array, inp: Uint8Array): { out: Uint8Array; code: number } {
   const n = p.length;
   const D = new Int32Array(256); let sp = 0;
@@ -98,9 +96,13 @@ function run(p: Uint8Array, inp: Uint8Array): { out: Uint8Array; code: number } 
         sp -= 2; M[a] = v; break;
       }
       case 0x50: {
-        const bytes = enc.encode(String(D[sp - 1]));
-        if (olen + bytes.length > 65536) return done(11);
-        sp--; out.set(bytes, olen); olen += bytes.length; break;
+        // Write the decimal digits straight into the output buffer: no
+        // TextEncoder allocation on this hot path.
+        const s = String(D[sp - 1]);
+        if (olen + s.length > 65536) return done(11);
+        sp--;
+        for (let i = 0; i < s.length; i++) out[olen++] = s.charCodeAt(i);
+        break;
       }
       case 0x51:
         if (olen + 1 > 65536) return done(11);
